@@ -8,6 +8,7 @@ from keras.applications.vgg16 import preprocess_input
 from keras.layers import Input
 from scipy.optimize import fmin_l_bfgs_b
 import time
+import os
 
 ##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~##
 ## Specify paths for 1) content image 2) style image and 3) generated image
@@ -15,7 +16,7 @@ import time
 
 cImPath = './initial_images/content_image.jpg'
 sImPath = './initial_images/style_image.jpg'
-genImOutputPath = 'output.jpg'
+genImOutputDirectory = './output/'
 
 ##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~##
 ## Image processing
@@ -119,10 +120,10 @@ def reprocess_array(x):
     x = preprocess_input(x)
     return x
 
-def save_original_size(x, target_size=cImageSizeOrig):
+def save_original_size(x, image_number, target_size=cImageSizeOrig):
     xIm = Image.fromarray(x)
     xIm = xIm.resize(target_size)
-    xIm.save(genImOutputPath)
+    xIm.save(genImOutputDirectory + f'/image_{image_number}.jpg')
     return xIm
 
 tf_session = K.get_session()
@@ -131,24 +132,23 @@ sModel = VGG16(include_top=False, weights='imagenet', input_tensor=sImArr)
 gModel = VGG16(include_top=False, weights='imagenet', input_tensor=gImPlaceholder)
 cLayerName = 'block4_conv2'
 sLayerNames = [
-                'block1_conv1',
-                'block2_conv1',
-                'block3_conv1',
-                'block4_conv1',
-                #'block5_conv1'
-                ]
+    'block1_conv1',
+    'block2_conv1',
+    'block3_conv1',
+    'block4_conv1',
+]
 
 P = get_feature_reps(x=cImArr, layer_names=[cLayerName], model=cModel)[0]
 As = get_feature_reps(x=sImArr, layer_names=sLayerNames, model=sModel)
 ws = np.ones(len(sLayerNames))/float(len(sLayerNames))
 
-iterations = 100
+iterations = 500
 x_val = gIm0.flatten()
+
 start = time.time()
-xopt, f_val, info= fmin_l_bfgs_b(calculate_loss, x_val, fprime=get_grad,
-                            maxiter=iterations, disp=True)
+xopt, f_val, info= fmin_l_bfgs_b(func=calculate_loss, x0=x_val, fprime=get_grad, maxiter=iterations, disp=True)
 xOut = postprocess_array(xopt)
-xIm = save_original_size(xOut)
-print('Image saved')
+xIm = save_original_size(xOut, image_number=0)
+print(f'Image saved')
 end = time.time()
-print('Time taken: {}'.format(end-start))
+print(f'Time taken: {end - start}')
