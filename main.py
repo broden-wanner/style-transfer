@@ -70,7 +70,7 @@ def get_style_loss(ws, Gs, As):
         style_loss += w*0.25*backend.sum(backend.square(G_gram - A_gram))/ (N_l**2 * M_l**2)
     return style_loss
 
-def get_total_loss(o_image_placeholder, alpha=1.0, beta=10000.0):
+def get_total_loss(o_image_placeholder, alpha=10.0, beta=10000.0):
     F = get_feature_reps(o_image_placeholder, layer_names=[c_layer_name], model=o_model)[0]
     Gs = get_feature_reps(o_image_placeholder, layer_names=s_layer_names, model=o_model)
     content_loss = get_content_loss(F, P)
