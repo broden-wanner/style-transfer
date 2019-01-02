@@ -110,21 +110,27 @@ def postprocess_array(x):
     x = x.astype('uint8')
     return x
 
-def save_image(x, image_number, target_size=c_image_original_size):
+def save_image(x, image_number=None, title=None, target_size=c_image_original_size):
     x_image = Image.fromarray(x)
     x_image = x_image.resize(target_size)
-    x_image.save(o_image_directory + f'/image_{image_number}.jpg')
+    if image_number:
+        image_path = o_image_directory + f'/image_at_iteration_{image_number}.jpg'
+    elif title:
+        image_path = o_image_directory + f'/{title}.jpg'
+    else:
+        image_path = o_image_directory + f'/output_image.jpg'
+    x_image.save(image_path)
     return x_image
 
-current_iterations = 0
+current_iteration = 0
 def callback_image_save(xk):
     '''
     Callback function to save the image at certain iterations
     '''
-    global current_iterations
-    current_iterations += 1
-    if current_iterations % 20 == 0:
-        x_image = save_image(postprocess_array(xk), image_number=current_iterations//20)
+    global current_iteration
+    current_iteration += 1
+    if current_iteration % 20 == 0:
+        x_image = save_image(postprocess_array(xk), image_number=current_iteration)
         print('Image saved')
 
 tf_session = backend.get_session()
@@ -150,7 +156,7 @@ x_val = o_image_initial.flatten()
 start = time.time()
 x_output, f_minimum_val, info_dict = fmin_l_bfgs_b(func=calculate_loss, x0=x_val, fprime=get_gradient, maxiter=iterations, disp=True, callback=callback_image_save)
 x_output = postprocess_array(x_output)
-x_image = save_image(x_output, image_number=0)
+x_image = save_image(x_output, title='final_image')
 print(f'Image saved')
 end = time.time()
 print(f'Time taken: {end - start}')
