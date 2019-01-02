@@ -11,9 +11,9 @@ from keras.layers import Input
 from scipy.optimize import fmin_l_bfgs_b
 
 # Specify image paths
-c_image_path = './initial_images/llama.jpg'
+c_image_path = './initial_images/french_horn.jpg'
 s_image_path = './initial_images/starry_night.jpg'
-o_image_directory = './llama_and_starry_night_output/'
+o_image_directory = './horn_and_starry_night_output/'
 directory = os.path.dirname(o_image_directory)
 if not os.path.exists(directory):
     os.makedirs(directory)
@@ -123,8 +123,8 @@ def callback_image_save(xk):
     '''
     global current_iterations
     current_iterations += 1
-    if current_iterations % 10 == 0:
-        x_image = save_image(postprocess_array(xk), image_number=current_iterations//10)
+    if current_iterations % 20 == 0:
+        x_image = save_image(postprocess_array(xk), image_number=current_iterations//20)
         print('Image saved')
 
 tf_session = backend.get_session()
