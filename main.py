@@ -13,8 +13,8 @@ from scipy.optimize import fmin_l_bfgs_b
 ## Specify paths for 1) content image 2) style image and 3) generated image
 ##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~##
 
-c_image_path = './initial_images/content_image.jpg'
-s_image_path = './initial_images/style_image.jpg'
+c_image_path = './initial_images/goldy.jpg'
+s_image_path = './initial_images/starry_night.jpg'
 o_image_directory = './output/'
 
 ##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~##
