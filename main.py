@@ -1,4 +1,5 @@
 import time
+import os
 import numpy as np
 import pandas as pd
 from PIL import Image
@@ -9,17 +10,15 @@ from keras.applications.vgg16 import preprocess_input
 from keras.layers import Input
 from scipy.optimize import fmin_l_bfgs_b
 
-##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~##
-## Specify paths for 1) content image 2) style image and 3) generated image
-##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~##
-
-c_image_path = './initial_images/goldy.jpg'
+# Specify image paths
+c_image_path = './initial_images/llama.jpg'
 s_image_path = './initial_images/starry_night.jpg'
-o_image_directory = './output/'
+o_image_directory = './llama_and_starry_night_output/'
+directory = os.path.dirname(o_image_directory)
+if not os.path.exists(directory):
+    os.makedirs(directory)
 
-##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~##
-## Image processing
-##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~##
+# Image Processing
 target_height = 512
 target_width = 512
 target_size = (target_height, target_width)
@@ -39,10 +38,7 @@ o_image_initial = preprocess_input(np.expand_dims(o_image_initial, axis=0))
 
 o_image_placeholder = backend.placeholder(shape=(1, target_width, target_height, 3))
 
-##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~##
-## Define loss and helper functions
-##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~##
-
+# Define the loss functions and other helper functions
 def get_feature_reps(x, layer_names, model):
     feature_matrices = []
     for layer in layer_names:
@@ -120,6 +116,17 @@ def save_image(x, image_number, target_size=c_image_original_size):
     x_image.save(o_image_directory + f'/image_{image_number}.jpg')
     return x_image
 
+current_iterations = 0
+def callback_image_save(xk):
+    '''
+    Callback function to save the image at certain iterations
+    '''
+    global current_iterations
+    current_iterations += 1
+    if current_iterations % 10 == 0:
+        x_image = save_image(postprocess_array(xk), image_number=current_iterations//10)
+        print('Image saved')
+
 tf_session = backend.get_session()
 c_model = VGG16(include_top=False, weights='imagenet', input_tensor=c_image_arr)
 s_model = VGG16(include_top=False, weights='imagenet', input_tensor=s_image_arr)
@@ -141,7 +148,7 @@ iterations = 500
 x_val = o_image_initial.flatten()
 
 start = time.time()
-x_output, f_minimum_val, info_dict = fmin_l_bfgs_b(func=calculate_loss, x0=x_val, fprime=get_gradient, maxiter=iterations, disp=True)
+x_output, f_minimum_val, info_dict = fmin_l_bfgs_b(func=calculate_loss, x0=x_val, fprime=get_gradient, maxiter=iterations, disp=True, callback=callback_image_save)
 x_output = postprocess_array(x_output)
 x_image = save_image(x_output, image_number=0)
 print(f'Image saved')
