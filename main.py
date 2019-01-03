@@ -22,7 +22,7 @@ if not os.path.exists(directory):
 alpha = 10.0
 beta = 10000.0
 
-# Creates a text file that describes the parameters used in the script
+# Create a text file that describes the parameters used in the script
 with open(o_image_directory + 'attributes.txt', 'w') as f:
     f.write('Attributes of Style Transfer\n\n')
     f.write(f'Content image: {c_image_path[17:]}\n')
@@ -87,22 +87,22 @@ def get_total_loss(o_image_placeholder, alpha=10.0, beta=10000.0):
     Gs = get_feature_reps(o_image_placeholder, layer_names=s_layer_names, model=o_model)
     content_loss = get_content_loss(F, P)
     style_loss = get_style_loss(ws, Gs, As)
-    total_lass = alpha * content_loss + beta * style_loss
-    return total_lass
+    total_loss = alpha * content_loss + beta * style_loss
+    return total_loss
 
 def calculate_loss(o_image_arr):
-    """
+    '''
     Calculate total loss using backend.function
-    """
+    '''
     if o_image_arr.shape != (1, target_width, target_width, 3):
         o_image_arr = o_image_arr.reshape((1, target_width, target_height, 3))
     loss_function = backend.function([o_model.input], [get_total_loss(o_model.input)])
     return loss_function([o_image_arr])[0].astype('float64')
 
 def get_gradient(o_image_arr):
-    """
+    '''
     Calculate the gradient of the loss function with respect to the generated image
-    """
+    '''
     if o_image_arr.shape != (1, target_width, target_height, 3):
         o_image_arr = o_image_arr.reshape((1, target_width, target_height, 3))
     gradient_function = backend.function([o_model.input], backend.gradients(get_total_loss(o_model.input), [o_model.input]))
@@ -132,7 +132,6 @@ def save_image(x, image_number=None, title=None, target_size=c_image_original_si
     else:
         image_path = o_image_directory + f'/output_image.jpg'
     x_image.save(image_path)
-    return x_image
 
 current_iteration = 0
 def callback_image_save(xk):
@@ -141,7 +140,7 @@ def callback_image_save(xk):
     '''
     global current_iteration
     current_iteration += 1
-    if current_iteration % 20 == 0:
+    if current_iteration % 20 == 0 or current_iteration == 1:
         x_image = save_image(postprocess_array(xk), image_number=current_iteration)
         print('Image saved')
 
@@ -168,7 +167,7 @@ x_val = o_image_initial.flatten()
 start = time.time()
 x_output, f_minimum_val, info_dict = fmin_l_bfgs_b(func=calculate_loss, x0=x_val, fprime=get_gradient, maxiter=iterations, disp=True, callback=callback_image_save)
 x_output = postprocess_array(x_output)
-x_image = save_image(x_output, title='final_image')
+save_image(x_output, title='final_image')
 print(f'Image saved')
 end = time.time()
 print(f'Time taken: {end - start}')
