@@ -18,6 +18,19 @@ directory = os.path.dirname(o_image_directory)
 if not os.path.exists(directory):
     os.makedirs(directory)
 
+# Specify weights of content (alpha) and style (beta) loss
+alpha = 10.0
+beta = 10000.0
+
+# Creates a text file that describes the parameters used in the script
+with open(o_image_directory + 'attributes.txt', 'w') as f:
+    f.write('Attributes of Style Transfer\n\n')
+    f.write(f'Content image: {c_image_path[17:]}\n')
+    f.write(f'Style image: {s_image_path[17:]}\n')
+    f.write(f'Model used: VGG16\n')
+    f.write(f'Alpha (content weight): {alpha}\n')
+    f.write(f'Beta (style weight): {beta}')
+
 # Image Processing
 target_height = 512
 target_width = 512
