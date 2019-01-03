@@ -16,9 +16,10 @@ o_image_directory = './output_cat_and_great_wave/'
 directory = os.path.dirname(o_image_directory)
 if not os.path.exists(directory):
     os.makedirs(directory)
+    print('[INFO] Created directory ' + o_image_directory[2:-1])
 
 # Specify weights of content (alpha) and style (beta) loss
-alpha = 10.0
+alpha = 20.0
 beta = 10000.0
 
 # Create a text file that describes the parameters used in the script
@@ -29,6 +30,7 @@ with open(o_image_directory + 'attributes.txt', 'w') as f:
     f.write(f'Model used: VGG16\n')
     f.write(f'Alpha (content weight): {alpha}\n')
     f.write(f'Beta (style weight): {beta}')
+print('[INFO] Created attributes.txt file')
 
 # Image Processing
 target_height = 512
@@ -48,6 +50,7 @@ s_image_arr = K.variable(preprocess_input(np.expand_dims(s_image_arr, axis=0)), 
 o_image_initial = np.random.randint(256, size=(target_width, target_height, 3)).astype('float64')
 o_image_initial = preprocess_input(np.expand_dims(o_image_initial, axis=0))
 o_image_placeholder = K.placeholder(shape=(1, target_width, target_height, 3))
+print('[INFO] Loaded images')
 
 # Define the loss functions and other helper functions
 def get_feature_reps(x, layer_names, model):
@@ -141,12 +144,13 @@ def callback_image_save(xk):
     current_iteration += 1
     if current_iteration % 20 == 0 or current_iteration == 1:
         x_image = save_image(postprocess_array(xk), image_number=current_iteration)
-        print('Image saved')
+        print('[INFO] Image saved')
 
 backend_session = K.get_session()
 c_model = VGG16(include_top=False, weights='imagenet', input_tensor=c_image_arr)
 s_model = VGG16(include_top=False, weights='imagenet', input_tensor=s_image_arr)
 o_model = VGG16(include_top=False, weights='imagenet', input_tensor=o_image_placeholder)
+print('[INFO] Created models')
 
 c_layer_name = 'block4_conv2'
 s_layer_names = [
@@ -168,9 +172,9 @@ try:
     x_output, f_minimum_val, info_dict = fmin_l_bfgs_b(func=calculate_loss, x0=x_val, fprime=get_gradient, maxiter=iterations, disp=True, callback=callback_image_save)
     x_output = postprocess_array(x_output)
     save_image(x_output, title='final_image')
-    print(f'Final image saved')
+    print('[INFO] Final image saved')
     end = time.time()
-    print(f'Time taken to run whole algorithm {iterations} iterations: {end - start}')
+    print(f'[INFO] Time taken to run whole algorithm {iterations} iterations: {end - start}')
 finally:
     # Write number of iterations went through to attributes file
     with open(o_image_directory + 'attributes.txt', 'a') as f:
@@ -181,4 +185,4 @@ finally:
         if os.path.splitext(filename)[1] == '.jpg':
             images.append(imageio.imread(o_image_directory + filename))
     imageio.mimsave(o_image_directory + 'collected_images.gif', images, duration=0.3)
-    print('Saved gif of collected images')
+    print('[INFO] Saved gif of collected images')
