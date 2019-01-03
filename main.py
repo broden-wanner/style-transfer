@@ -1,19 +1,18 @@
-import time
 import os
+import time
 import numpy as np
-import pandas as pd
+import imageio # Used for creating the gif
 from PIL import Image
-from keras import backend
+from keras import backend as K
 from keras.preprocessing.image import load_img, img_to_array
 from keras.applications import VGG16
 from keras.applications.vgg16 import preprocess_input
-from keras.layers import Input
 from scipy.optimize import fmin_l_bfgs_b
 
 # Specify image paths
-c_image_path = './initial_images/apples.jpg'
-s_image_path = './initial_images/pointilism.jpg'
-o_image_directory = './output_apples_and_pointillism/'
+c_image_path = './initial_images/cat.jpg'
+s_image_path = './initial_images/great_wave.jpg'
+o_image_directory = './output_cat_and_great_wave/'
 directory = os.path.dirname(o_image_directory)
 if not os.path.exists(directory):
     os.makedirs(directory)
@@ -40,15 +39,15 @@ c_image_original = Image.open(c_image_path)
 c_image_original_size = c_image_original.size
 c_image = load_img(path=c_image_path, target_size=target_size)
 c_image_arr = img_to_array(c_image)
-c_image_arr = backend.variable(preprocess_input(np.expand_dims(c_image_arr, axis=0)), dtype='float32')
+c_image_arr = K.variable(preprocess_input(np.expand_dims(c_image_arr, axis=0)), dtype='float32')
 
 s_image = load_img(path=s_image_path, target_size=target_size)
 s_image_arr = img_to_array(s_image)
-s_image_arr = backend.variable(preprocess_input(np.expand_dims(s_image_arr, axis=0)), dtype='float32')
+s_image_arr = K.variable(preprocess_input(np.expand_dims(s_image_arr, axis=0)), dtype='float32')
 
 o_image_initial = np.random.randint(256, size=(target_width, target_height, 3)).astype('float64')
 o_image_initial = preprocess_input(np.expand_dims(o_image_initial, axis=0))
-o_image_placeholder = backend.placeholder(shape=(1, target_width, target_height, 3))
+o_image_placeholder = K.placeholder(shape=(1, target_width, target_height, 3))
 
 # Define the loss functions and other helper functions
 def get_feature_reps(x, layer_names, model):
@@ -56,33 +55,33 @@ def get_feature_reps(x, layer_names, model):
     for layer in layer_names:
         current_layer = model.get_layer(layer)
         feature_raw = current_layer.output
-        feature_raw_shape = backend.shape(feature_raw).eval(session=tf_session)
+        feature_raw_shape = K.shape(feature_raw).eval(session=backend_session)
         N_l = feature_raw_shape[-1]
         M_l = feature_raw_shape[1]*feature_raw_shape[2]
-        feature_matrix = backend.reshape(feature_raw, (M_l, N_l))
-        feature_matrix = backend.transpose(feature_matrix)
+        feature_matrix = K.reshape(feature_raw, (M_l, N_l))
+        feature_matrix = K.transpose(feature_matrix)
         feature_matrices.append(feature_matrix)
     return feature_matrices
 
 def get_content_loss(F, P):
-    content_loss = 0.5*backend.sum(backend.square(F - P))
+    content_loss = 0.5*K.sum(K.square(F - P))
     return content_loss
 
 def get_gram_matrix(F):
-    G = backend.dot(F, backend.transpose(F))
+    G = K.dot(F, K.transpose(F))
     return G
 
 def get_style_loss(ws, Gs, As):
-    style_loss = backend.variable(0.)
+    style_loss = K.variable(0.)
     for w, G, A in zip(ws, Gs, As):
-        M_l = backend.int_shape(G)[1]
-        N_l = backend.int_shape(G)[0]
+        M_l = K.int_shape(G)[1]
+        N_l = K.int_shape(G)[0]
         G_gram = get_gram_matrix(G)
         A_gram = get_gram_matrix(A)
-        style_loss += w*0.25*backend.sum(backend.square(G_gram - A_gram))/ (N_l**2 * M_l**2)
+        style_loss += w*0.25*K.sum(K.square(G_gram - A_gram))/ (N_l**2 * M_l**2)
     return style_loss
 
-def get_total_loss(o_image_placeholder, alpha=10.0, beta=10000.0):
+def get_total_loss(o_image_placeholder):
     F = get_feature_reps(o_image_placeholder, layer_names=[c_layer_name], model=o_model)[0]
     Gs = get_feature_reps(o_image_placeholder, layer_names=s_layer_names, model=o_model)
     content_loss = get_content_loss(F, P)
@@ -92,11 +91,11 @@ def get_total_loss(o_image_placeholder, alpha=10.0, beta=10000.0):
 
 def calculate_loss(o_image_arr):
     '''
-    Calculate total loss using backend.function
+    Calculate total loss using K.function
     '''
     if o_image_arr.shape != (1, target_width, target_width, 3):
         o_image_arr = o_image_arr.reshape((1, target_width, target_height, 3))
-    loss_function = backend.function([o_model.input], [get_total_loss(o_model.input)])
+    loss_function = K.function([o_model.input], [get_total_loss(o_model.input)])
     return loss_function([o_image_arr])[0].astype('float64')
 
 def get_gradient(o_image_arr):
@@ -105,7 +104,7 @@ def get_gradient(o_image_arr):
     '''
     if o_image_arr.shape != (1, target_width, target_height, 3):
         o_image_arr = o_image_arr.reshape((1, target_width, target_height, 3))
-    gradient_function = backend.function([o_model.input], backend.gradients(get_total_loss(o_model.input), [o_model.input]))
+    gradient_function = K.function([o_model.input], K.gradients(get_total_loss(o_model.input), [o_model.input]))
     gradient = gradient_function([o_image_arr])[0].flatten().astype('float64')
     return gradient
 
@@ -144,7 +143,7 @@ def callback_image_save(xk):
         x_image = save_image(postprocess_array(xk), image_number=current_iteration)
         print('Image saved')
 
-tf_session = backend.get_session()
+backend_session = K.get_session()
 c_model = VGG16(include_top=False, weights='imagenet', input_tensor=c_image_arr)
 s_model = VGG16(include_top=False, weights='imagenet', input_tensor=s_image_arr)
 o_model = VGG16(include_top=False, weights='imagenet', input_tensor=o_image_placeholder)
@@ -173,8 +172,10 @@ try:
     end = time.time()
     print(f'Time taken to run whole algorithm {iterations} iterations: {end - start}')
 finally:
-    # Collect images in a gif even after keyboardinterrupt
-    import imageio
+    # Write number of iterations went through to attributes file
+    with open(o_image_directory + 'attributes.txt', 'a') as f:
+        f.write(f'Number of iterations: {current_iteration}')
+    # Collect images in a gif
     images = []
     for filename in os.listdir(o_image_directory):
         if os.path.splitext(filename)[1] == '.jpg':

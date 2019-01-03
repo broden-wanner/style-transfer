@@ -1,0 +1,7 @@
+Attributes of Style Transfer
+
+Content image: cat.jpg
+Style image: great_wave.jpg
+Model used: VGG16
+Alpha (content weight): 10.0
+Beta (style weight): 10000.0
