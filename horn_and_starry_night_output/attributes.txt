@@ -1,7 +1,0 @@
-Attributes of Style Transfer
-
-Content image: french_horn.jpg
-Style image: starry_night.jpg
-Model used: VGG16
-Alpha (content weight): 10.0
-Beta (style weight): 10000.0

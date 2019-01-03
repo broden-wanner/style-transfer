@@ -77,10 +77,16 @@ class StyleTransfer:
         return feature_matrices
 
     def get_content_loss(self, F, P):
+        '''
+        Calculuates the content loss using mean squared error
+        '''
         content_loss = 0.5*backend.sum(backend.square(F - P))
         return content_loss
 
     def get_gram_matrix(self, F):
+        '''
+        Get the gram matrix for style loss function
+        '''
         G = backend.dot(F, backend.transpose(F))
         return G
 

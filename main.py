@@ -11,9 +11,9 @@ from keras.layers import Input
 from scipy.optimize import fmin_l_bfgs_b
 
 # Specify image paths
-c_image_path = './initial_images/french_horn.jpg'
-s_image_path = './initial_images/starry_night.jpg'
-o_image_directory = './horn_and_starry_night_output/'
+c_image_path = './initial_images/apples.jpg'
+s_image_path = './initial_images/pointilism.jpg'
+o_image_directory = './output_apples_and_pointillism/'
 directory = os.path.dirname(o_image_directory)
 if not os.path.exists(directory):
     os.makedirs(directory)
@@ -126,7 +126,7 @@ def save_image(x, image_number=None, title=None, target_size=c_image_original_si
     x_image = Image.fromarray(x)
     x_image = x_image.resize(target_size)
     if image_number:
-        image_path = o_image_directory + f'/image_at_iteration_{image_number}.jpg'
+        image_path = o_image_directory + f'/image_at_iteration_{image_number:03d}.jpg'
     elif title:
         image_path = o_image_directory + f'/{title}.jpg'
     else:
@@ -165,9 +165,19 @@ iterations = 500
 x_val = o_image_initial.flatten()
 
 start = time.time()
-x_output, f_minimum_val, info_dict = fmin_l_bfgs_b(func=calculate_loss, x0=x_val, fprime=get_gradient, maxiter=iterations, disp=True, callback=callback_image_save)
-x_output = postprocess_array(x_output)
-save_image(x_output, title='final_image')
-print(f'Image saved')
-end = time.time()
-print(f'Time taken: {end - start}')
+try:
+    x_output, f_minimum_val, info_dict = fmin_l_bfgs_b(func=calculate_loss, x0=x_val, fprime=get_gradient, maxiter=iterations, disp=True, callback=callback_image_save)
+    x_output = postprocess_array(x_output)
+    save_image(x_output, title='final_image')
+    print(f'Final image saved')
+    end = time.time()
+    print(f'Time taken to run whole algorithm {iterations} iterations: {end - start}')
+finally:
+    # Collect images in a gif even after keyboardinterrupt
+    import imageio
+    images = []
+    for filename in os.listdir(o_image_directory):
+        if os.path.splitext(filename)[1] == '.jpg':
+            images.append(imageio.imread(o_image_directory + filename))
+    imageio.mimsave(o_image_directory + 'collected_images.gif', images, duration=0.3)
+    print('Saved gif of collected images')
