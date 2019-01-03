@@ -35,7 +35,6 @@ s_image_arr = backend.variable(preprocess_input(np.expand_dims(s_image_arr, axis
 
 o_image_initial = np.random.randint(256, size=(target_width, target_height, 3)).astype('float64')
 o_image_initial = preprocess_input(np.expand_dims(o_image_initial, axis=0))
-
 o_image_placeholder = backend.placeholder(shape=(1, target_width, target_height, 3))
 
 # Define the loss functions and other helper functions
