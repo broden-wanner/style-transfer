@@ -5,14 +5,14 @@ import imageio # Used for creating the gif
 from PIL import Image
 from keras import backend as K
 from keras.preprocessing.image import load_img, img_to_array
-from keras.applications import VGG16
+from keras.applications import VGG19
 from keras.applications.vgg16 import preprocess_input
 from scipy.optimize import fmin_l_bfgs_b
 
 # Specify image paths
 c_image_path = './initial_images/cat.jpg'
 s_image_path = './initial_images/great_wave.jpg'
-o_image_directory = './output_cat_and_great_wave/'
+o_image_directory = './output_cat_and_great_wave_vgg19/'
 directory = os.path.dirname(o_image_directory)
 if not os.path.exists(directory):
     os.makedirs(directory)
@@ -22,14 +22,34 @@ if not os.path.exists(directory):
 alpha = 20.0
 beta = 10000.0
 
+# Specify pre-trained keras model and layers to use in model
+keras_model = VGG19
+c_layer_name = 'block4_conv2'
+s_layer_names = [
+    'block1_conv1',
+    'block1_conv2',
+    'block2_conv1',
+    'block2_conv2',
+    'block3_conv1',
+    'block3_conv2',
+    'block4_conv1',
+    'block5_conv1',
+]
+
 # Create a text file that describes the parameters used in the script
 with open(o_image_directory + 'attributes.txt', 'w') as f:
     f.write('Attributes of Style Transfer\n\n')
     f.write(f'Content image: {c_image_path[17:]}\n')
     f.write(f'Style image: {s_image_path[17:]}\n')
-    f.write(f'Model used: VGG16\n')
+    f.write(f'Model used: VGG19\n')
     f.write(f'Alpha (content weight): {alpha}\n')
-    f.write(f'Beta (style weight): {beta}')
+    f.write(f'Beta (style weight): {beta}\n')
+    f.write(f'Content layers used:\n')
+    f.writelines('\t' + layer for layer in [c_layer_name])
+    f.write('\n')
+    f.write(f'Style layers used:\n')
+    f.writelines('\t' + layer for layer in s_layer_names)
+    f.write('\n')
 print('[INFO] Created attributes.txt file')
 
 # Image Processing
@@ -99,7 +119,8 @@ def calculate_loss(o_image_arr):
     if o_image_arr.shape != (1, target_width, target_width, 3):
         o_image_arr = o_image_arr.reshape((1, target_width, target_height, 3))
     loss_function = K.function([o_model.input], [get_total_loss(o_model.input)])
-    return loss_function([o_image_arr])[0].astype('float64')
+    loss = loss_function([o_image_arr])[0].astype('float64')
+    return loss
 
 def get_gradient(o_image_arr):
     '''
@@ -136,29 +157,26 @@ def save_image(x, image_number=None, title=None, target_size=c_image_original_si
     x_image.save(image_path)
 
 current_iteration = 0
+start_time = time.time()
 def callback_image_save(xk):
     '''
     Callback function to save the image at certain iterations
     '''
     global current_iteration
+    global start_time
     current_iteration += 1
+    end_time = time.time()
+    print(f'Time taken for iteration: {end_time - start_time:.5f} s')
+    start_time = end_time
     if current_iteration % 20 == 0 or current_iteration == 1:
         x_image = save_image(postprocess_array(xk), image_number=current_iteration)
         print('[INFO] Image saved')
 
 backend_session = K.get_session()
-c_model = VGG16(include_top=False, weights='imagenet', input_tensor=c_image_arr)
-s_model = VGG16(include_top=False, weights='imagenet', input_tensor=s_image_arr)
-o_model = VGG16(include_top=False, weights='imagenet', input_tensor=o_image_placeholder)
+c_model = keras_model(include_top=False, weights='imagenet', input_tensor=c_image_arr)
+s_model = keras_model(include_top=False, weights='imagenet', input_tensor=s_image_arr)
+o_model = keras_model(include_top=False, weights='imagenet', input_tensor=o_image_placeholder)
 print('[INFO] Created models')
-
-c_layer_name = 'block4_conv2'
-s_layer_names = [
-    'block1_conv1',
-    'block2_conv1',
-    'block3_conv1',
-    'block4_conv1',
-]
 
 P = get_feature_reps(x=c_image_arr, layer_names=[c_layer_name], model=c_model)[0]
 As = get_feature_reps(x=s_image_arr, layer_names=s_layer_names, model=s_model)
@@ -178,7 +196,7 @@ try:
 finally:
     # Write number of iterations went through to attributes file
     with open(o_image_directory + 'attributes.txt', 'a') as f:
-        f.write(f'Number of iterations: {current_iteration}')
+        f.write(f'\nNumber of iterations: {current_iteration}')
     # Collect images in a gif
     images = []
     for filename in os.listdir(o_image_directory):

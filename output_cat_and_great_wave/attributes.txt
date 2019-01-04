@@ -4,4 +4,4 @@ Content image: cat.jpg
 Style image: great_wave.jpg
 Model used: VGG16
 Alpha (content weight): 20.0
-Beta (style weight): 10000.0
+Beta (style weight): 10000.0Number of iterations: 250
