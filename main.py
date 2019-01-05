@@ -5,35 +5,30 @@ import imageio # Used for creating the gif
 from PIL import Image
 from keras import backend as K
 from keras.preprocessing.image import load_img, img_to_array
-from keras.applications import VGG19
+from keras.applications import VGG16
 from keras.applications.vgg16 import preprocess_input
 from scipy.optimize import fmin_l_bfgs_b
 
 # Specify image paths
-c_image_path = './initial_images/cat.jpg'
-s_image_path = './initial_images/great_wave.jpg'
-o_image_directory = './output_cat_and_great_wave_vgg19/'
+c_image_path = './initial_images/emma_watson.jpg'
+s_image_path = './initial_images/da_vinci.jpg'
+o_image_directory = './output_emma_and_da_vinci/'
 directory = os.path.dirname(o_image_directory)
 if not os.path.exists(directory):
     os.makedirs(directory)
     print('[INFO] Created directory ' + o_image_directory[2:-1])
 
 # Specify weights of content (alpha) and style (beta) loss
-alpha = 20.0
+alpha = 30.0
 beta = 10000.0
 
-# Specify pre-trained keras model and layers to use in model
-keras_model = VGG19
+# Specify layers to use in model
 c_layer_name = 'block4_conv2'
 s_layer_names = [
     'block1_conv1',
-    'block1_conv2',
     'block2_conv1',
-    'block2_conv2',
     'block3_conv1',
-    'block3_conv2',
     'block4_conv1',
-    'block5_conv1',
 ]
 
 # Create a text file that describes the parameters used in the script
@@ -173,9 +168,9 @@ def callback_image_save(xk):
         print('[INFO] Image saved')
 
 backend_session = K.get_session()
-c_model = keras_model(include_top=False, weights='imagenet', input_tensor=c_image_arr)
-s_model = keras_model(include_top=False, weights='imagenet', input_tensor=s_image_arr)
-o_model = keras_model(include_top=False, weights='imagenet', input_tensor=o_image_placeholder)
+c_model = VGG16(include_top=False, weights='imagenet', pooling='avg', input_tensor=c_image_arr)
+s_model = VGG16(include_top=False, weights='imagenet', pooling='avg', input_tensor=s_image_arr)
+o_model = VGG16(include_top=False, weights='imagenet', pooling='avg', input_tensor=o_image_placeholder)
 print('[INFO] Created models')
 
 P = get_feature_reps(x=c_image_arr, layer_names=[c_layer_name], model=c_model)[0]
