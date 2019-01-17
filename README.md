@@ -8,6 +8,7 @@ an image and the style of another image, and the script finds the image that min
 Uses Keras with Tensorflow backend.
 
 Examples:
+
 <img width="100" src="https://github.com/broden-wanner/artwithai/blob/master/initial_images/french_horn.jpg">
 
 <img width="100" src="https://github.com/broden-wanner/artwithai/blob/master/initial_images/starry_night.jpg">
