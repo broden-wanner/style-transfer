@@ -9,8 +9,8 @@ Uses Keras with Tensorflow backend.
 
 Examples:
 
-<img width="100" src="https://github.com/broden-wanner/artwithai/blob/master/initial_images/french_horn.jpg">
-
-<img width="100" src="https://github.com/broden-wanner/artwithai/blob/master/initial_images/starry_night.jpg">
+<img width="200" alight="middle" src="https://github.com/broden-wanner/artwithai/blob/master/initial_images/french_horn.jpg">
+<img width="100" src="https://img.icons8.com/metro/1600/plus-math.png">
+<img width="200" src="https://github.com/broden-wanner/artwithai/blob/master/initial_images/starry_night.jpg">
 
 <img width="100" src="https://github.com/broden-wanner/artwithai/blob/master/output_horn_and_starry_night/collected_images.gif">
