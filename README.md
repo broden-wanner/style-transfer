@@ -7,7 +7,7 @@ pre-trained weights (e.g. from ImageNet) work quite well. In essence, a loss fun
 an image and the style of another image, and the script finds the image that minimizes this loss function.
 Uses Keras with Tensorflow backend.
 
-Examples:
+Example:
 
 <img width="600" alight="middle" src="https://github.com/broden-wanner/artwithai/blob/master/initial_images/french_horn.jpg">
 <img width="100" src="https://img.icons8.com/metro/1600/plus-math.png">
