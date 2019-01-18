@@ -10,18 +10,18 @@ from keras.applications.vgg16 import preprocess_input
 from scipy.optimize import fmin_l_bfgs_b
 
 class StyleTransfer:
-    def __init__(self):
+    def __init__(self, c_image_path, s_image_path, o_image_directory, alpha=10.0, beta=10000.0):
         # Specify image paths
-        self.c_image_path = './initial_images/french_horn.jpg'
-        self.s_image_path = './initial_images/starry_night.jpg'
-        self.o_image_directory = './horn_and_starry_night_output/'
+        self.c_image_path = c_image_path
+        self.s_image_path = s_image_path
+        self.o_image_directory = o_image_directory
         directory = os.path.dirname(self.o_image_directory)
         if not os.path.exists(directory):
             os.makedirs(directory)
 
         # Specify weights of content (alpha) and style (beta) loss
-        self.alpha = 10.0
-        self.beta = 10000.0
+        self.alpha = alpha
+        self.beta = beta
 
         # Create a text file that describes the parameters used in the script
         self.create_attributes_file()

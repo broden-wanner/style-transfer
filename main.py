@@ -1,26 +1,39 @@
 import os
 import time
 import numpy as np
+import tensorflow as tf
 import imageio # Used for creating the gif
 from PIL import Image
 from keras import backend as K
 from keras.preprocessing.image import load_img, img_to_array
-from keras.applications import VGG16
-from keras.applications.vgg16 import preprocess_input
-from scipy.optimize import fmin_l_bfgs_b
+from keras.applications import VGG16, VGG19
+from keras.applications.vgg16 import preprocess_input as vgg16_preprocess
+from keras.applications.vgg19 import preprocess_input as vgg19_preprocess
+from scipy.optimize import fmin_l_bfgs_b, minimize
 
 # Specify image paths
-c_image_path = './initial_images/emma_watson.jpg'
-s_image_path = './initial_images/da_vinci.jpg'
-o_image_directory = './output_emma_and_da_vinci/'
+c_image_path = './initial_images/corgi.jpg'
+s_image_path = './initial_images/cubism.jpg'
+o_image_directory = './output_corgi_and_cubism/'
 directory = os.path.dirname(o_image_directory)
 if not os.path.exists(directory):
     os.makedirs(directory)
     print('[INFO] Created directory ' + o_image_directory[2:-1])
 
-# Specify weights of content (alpha) and style (beta) loss
-alpha = 30.0
+# Specify weights of content (alpha), style (beta), and variation (gamma) loss
+alpha = 20.0
 beta = 10000.0
+gamma = 100.0
+
+# Specify type of model used
+model_name = 'VGG16'
+Model = None
+if model_name == 'VGG16':
+    Model = VGG16
+    preprocess_input = vgg16_preprocess
+elif model_name == 'VGG19':
+    Model = VGG19
+    preprocess_input = vgg19_preprocess
 
 # Specify layers to use in model
 c_layer_name = 'block4_conv2'
@@ -36,15 +49,19 @@ with open(o_image_directory + 'attributes.txt', 'w') as f:
     f.write('Attributes of Style Transfer\n\n')
     f.write(f'Content image: {c_image_path[17:]}\n')
     f.write(f'Style image: {s_image_path[17:]}\n')
-    f.write(f'Model used: VGG19\n')
+    f.write(f'Model used: {model_name}\n')
     f.write(f'Alpha (content weight): {alpha}\n')
     f.write(f'Beta (style weight): {beta}\n')
+    f.write(f'Gamma (total variation weight): {gamma}')
     f.write(f'Content layers used:\n')
     f.writelines('\t' + layer for layer in [c_layer_name])
     f.write('\n')
     f.write(f'Style layers used:\n')
     f.writelines('\t' + layer for layer in s_layer_names)
     f.write('\n')
+    f.write(f'Special Notes:\n')
+    f.write(f'\tNone\n')
+
 print('[INFO] Created attributes.txt file')
 
 # Image Processing
@@ -62,13 +79,16 @@ s_image = load_img(path=s_image_path, target_size=target_size)
 s_image_arr = img_to_array(s_image)
 s_image_arr = K.variable(preprocess_input(np.expand_dims(s_image_arr, axis=0)), dtype='float32')
 
-o_image_initial = np.random.randint(256, size=(target_width, target_height, 3)).astype('float64')
+o_image_initial = np.random.randint(256, size=(target_width, target_height, 3)).astype('float32')
 o_image_initial = preprocess_input(np.expand_dims(o_image_initial, axis=0))
 o_image_placeholder = K.placeholder(shape=(1, target_width, target_height, 3))
 print('[INFO] Loaded images')
 
 # Define the loss functions and other helper functions
 def get_feature_reps(x, layer_names, model):
+    '''
+    Calculates the feature representations for each specified layer in the given model
+    '''
     feature_matrices = []
     for layer in layer_names:
         current_layer = model.get_layer(layer)
@@ -82,14 +102,23 @@ def get_feature_reps(x, layer_names, model):
     return feature_matrices
 
 def get_content_loss(F, P):
+    '''
+    Computes the loss function for the given content feature representations
+    '''
     content_loss = 0.5*K.sum(K.square(F - P))
     return content_loss
 
 def get_gram_matrix(F):
+    '''
+    Computes the Gram matrix of a given feature representation
+    '''
     G = K.dot(F, K.transpose(F))
     return G
 
 def get_style_loss(ws, Gs, As):
+    '''
+    Computes the loss function for the the given style feautre representations
+    '''
     style_loss = K.variable(0.)
     for w, G, A in zip(ws, Gs, As):
         M_l = K.int_shape(G)[1]
@@ -99,12 +128,22 @@ def get_style_loss(ws, Gs, As):
         style_loss += w*0.25*K.sum(K.square(G_gram - A_gram))/ (N_l**2 * M_l**2)
     return style_loss
 
+def get_variation_loss(x):
+    '''
+    Computes the total variation loss for a given image
+    '''
+    return tf.image.total_variation(x)
+
 def get_total_loss(o_image_placeholder):
+    '''
+    Combines the loss of the content and style images
+    '''
     F = get_feature_reps(o_image_placeholder, layer_names=[c_layer_name], model=o_model)[0]
     Gs = get_feature_reps(o_image_placeholder, layer_names=s_layer_names, model=o_model)
     content_loss = get_content_loss(F, P)
     style_loss = get_style_loss(ws, Gs, As)
-    total_loss = alpha * content_loss + beta * style_loss
+    variation_loss = get_variation_loss(o_image_placeholder)
+    total_loss = alpha*content_loss + beta*style_loss + gamma*variation_loss
     return total_loss
 
 def calculate_loss(o_image_arr):
@@ -117,7 +156,7 @@ def calculate_loss(o_image_arr):
     loss = loss_function([o_image_arr])[0].astype('float64')
     return loss
 
-def get_gradient(o_image_arr):
+def calculuate_gradient(o_image_arr):
     '''
     Calculate the gradient of the loss function with respect to the generated image
     '''
@@ -128,6 +167,9 @@ def get_gradient(o_image_arr):
     return gradient
 
 def postprocess_array(x):
+    '''
+    Changes input vector to 3-d array and scales pixel values
+    '''
     # Zero-center by mean pixel
     if x.shape != (target_width, target_height, 3):
         x = x.reshape((target_width, target_height, 3))
@@ -141,6 +183,9 @@ def postprocess_array(x):
     return x
 
 def save_image(x, image_number=None, title=None, target_size=c_image_original_size):
+    '''
+    Changes 3-d pixel array to an image and saves it
+    '''
     x_image = Image.fromarray(x)
     x_image = x_image.resize(target_size)
     if image_number:
@@ -150,6 +195,7 @@ def save_image(x, image_number=None, title=None, target_size=c_image_original_si
     else:
         image_path = o_image_directory + f'/output_image.jpg'
     x_image.save(image_path)
+    print(f'[INFO] Image saved at {image_path}')
 
 current_iteration = 0
 start_time = time.time()
@@ -159,39 +205,54 @@ def callback_image_save(xk):
     '''
     global current_iteration
     global start_time
-    current_iteration += 1
     end_time = time.time()
     print(f'Time taken for iteration: {end_time - start_time:.5f} s')
     start_time = end_time
+    current_iteration += 1
     if current_iteration % 20 == 0 or current_iteration == 1:
         x_image = save_image(postprocess_array(xk), image_number=current_iteration)
-        print('[INFO] Image saved')
+
 
 backend_session = K.get_session()
-c_model = VGG16(include_top=False, weights='imagenet', pooling='avg', input_tensor=c_image_arr)
-s_model = VGG16(include_top=False, weights='imagenet', pooling='avg', input_tensor=s_image_arr)
-o_model = VGG16(include_top=False, weights='imagenet', pooling='avg', input_tensor=o_image_placeholder)
+c_model = Model(include_top=False, weights='imagenet', input_tensor=c_image_arr)
+s_model = Model(include_top=False, weights='imagenet', input_tensor=s_image_arr)
+o_model = Model(include_top=False, weights='imagenet', input_tensor=o_image_placeholder)
 print('[INFO] Created models')
+print('[INFO] Model summary for each image:')
+c_model.summary()
 
 P = get_feature_reps(x=c_image_arr, layer_names=[c_layer_name], model=c_model)[0]
 As = get_feature_reps(x=s_image_arr, layer_names=s_layer_names, model=s_model)
 ws = np.ones(len(s_layer_names)) / float(len(s_layer_names))
 
-iterations = 500
+iterations = 250
 x_val = o_image_initial.flatten()
 
 start = time.time()
 try:
-    x_output, f_minimum_val, info_dict = fmin_l_bfgs_b(func=calculate_loss, x0=x_val, fprime=get_gradient, maxiter=iterations, disp=True, callback=callback_image_save)
-    x_output = postprocess_array(x_output)
+    minimization_options = {
+        'fun': calculate_loss,
+        'x0': x_val,
+        'method': 'L-BFGS-B',
+        'jac': calculuate_gradient,
+        'callback': callback_image_save,
+        'options': {
+            'maxiter': iterations,
+            'disp': True,
+        },
+    }
+    # x_output, f_minimum_val, info_dict = fmin_l_bfgs_b(**minimization_options)
+    result = minimize(**minimization_options)
+    x_output = postprocess_array(result.x)
     save_image(x_output, title='final_image')
     print('[INFO] Final image saved')
     end = time.time()
     print(f'[INFO] Time taken to run whole algorithm {iterations} iterations: {end - start}')
 finally:
-    # Write number of iterations went through to attributes file
+    # Write number of iterations and time went through to attributes file
     with open(o_image_directory + 'attributes.txt', 'a') as f:
         f.write(f'\nNumber of iterations: {current_iteration}')
+        f.write(f'\nTime: {time.time() - start}')
     # Collect images in a gif
     images = []
     for filename in os.listdir(o_image_directory):

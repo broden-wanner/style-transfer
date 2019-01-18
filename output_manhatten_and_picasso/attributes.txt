@@ -1,0 +1,13 @@
+Attributes of Style Transfer
+
+Content image: manhattan.jpg
+Style image: picasso.jpg
+Model used: VGG19
+Alpha (content weight): 30.0
+Beta (style weight): 10000.0
+Content layers used:
+	block4_conv2
+Style layers used:
+	block1_conv1	block2_conv1	block3_conv1	block4_conv1
+
+Number of iterations: 240
