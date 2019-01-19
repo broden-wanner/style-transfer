@@ -1,7 +1,6 @@
 import os
 import time
 import numpy as np
-import tensorflow as tf
 import imageio # Used for creating the gif
 from PIL import Image
 from keras import backend as K
@@ -12,16 +11,16 @@ from keras.applications.vgg19 import preprocess_input as vgg19_preprocess
 from scipy.optimize import fmin_l_bfgs_b, minimize
 
 # Specify image paths
-c_image_path = './initial_images/corgi.jpg'
-s_image_path = './initial_images/cubism.jpg'
-o_image_directory = './output_corgi_and_cubism/'
+c_image_path = './initial_images/llama.jpg'
+s_image_path = './initial_images/starry_night.jpg'
+o_image_directory = './output/llama_and_starry_night'
 directory = os.path.dirname(o_image_directory)
 if not os.path.exists(directory):
     os.makedirs(directory)
     print('[INFO] Created directory ' + o_image_directory[2:-1])
 
 # Specify weights of content (alpha), style (beta), and variation (gamma) loss
-alpha = 20.0
+alpha = 5.0
 beta = 10000.0
 gamma = 100.0
 
@@ -52,7 +51,7 @@ with open(o_image_directory + 'attributes.txt', 'w') as f:
     f.write(f'Model used: {model_name}\n')
     f.write(f'Alpha (content weight): {alpha}\n')
     f.write(f'Beta (style weight): {beta}\n')
-    f.write(f'Gamma (total variation weight): {gamma}')
+    f.write(f'Gamma (total variation weight): {gamma}\n')
     f.write(f'Content layers used:\n')
     f.writelines('\t' + layer for layer in [c_layer_name])
     f.write('\n')
@@ -130,9 +129,12 @@ def get_style_loss(ws, Gs, As):
 
 def get_variation_loss(x):
     '''
-    Computes the total variation loss for a given image
+    Computes the total variation loss for a given image. This measures how much noise is in the
+    images and is used to supress noise during optimization.
     '''
-    return tf.image.total_variation(x)
+    pixel_dif1 = x[:, :, :-1, :-1] - x[:, :, 1:, :-1]
+    pixel_dif2 = x[:, :, :-1, :-1] - x[:, :, :-1, 1:]
+    return K.sum(K.pow(pixel_dif1 + pixel_dif2, 2))
 
 def get_total_loss(o_image_placeholder):
     '''
@@ -160,10 +162,12 @@ def calculuate_gradient(o_image_arr):
     '''
     Calculate the gradient of the loss function with respect to the generated image
     '''
+    grad_start = time.time()
     if o_image_arr.shape != (1, target_width, target_height, 3):
         o_image_arr = o_image_arr.reshape((1, target_width, target_height, 3))
     gradient_function = K.function([o_model.input], K.gradients(get_total_loss(o_model.input), [o_model.input]))
     gradient = gradient_function([o_image_arr])[0].flatten().astype('float64')
+    print(f'Time to find gradient: {time.time() - grad_start:.5f} s')
     return gradient
 
 def postprocess_array(x):
@@ -212,7 +216,7 @@ def callback_image_save(xk):
     if current_iteration % 20 == 0 or current_iteration == 1:
         x_image = save_image(postprocess_array(xk), image_number=current_iteration)
 
-
+# Initialize the models
 backend_session = K.get_session()
 c_model = Model(include_top=False, weights='imagenet', input_tensor=c_image_arr)
 s_model = Model(include_top=False, weights='imagenet', input_tensor=s_image_arr)
@@ -221,13 +225,16 @@ print('[INFO] Created models')
 print('[INFO] Model summary for each image:')
 c_model.summary()
 
+# Get the feature represenations of the content and style images
 P = get_feature_reps(x=c_image_arr, layer_names=[c_layer_name], model=c_model)[0]
 As = get_feature_reps(x=s_image_arr, layer_names=s_layer_names, model=s_model)
+
+# Initialize weights to be reciprocal of number of style layers used
 ws = np.ones(len(s_layer_names)) / float(len(s_layer_names))
 
+# Start the minimization process
 iterations = 250
 x_val = o_image_initial.flatten()
-
 start = time.time()
 try:
     minimization_options = {
@@ -244,19 +251,19 @@ try:
     # x_output, f_minimum_val, info_dict = fmin_l_bfgs_b(**minimization_options)
     result = minimize(**minimization_options)
     x_output = postprocess_array(result.x)
-    save_image(x_output, title='final_image')
+    save_image(x_output, title='last_image')
     print('[INFO] Final image saved')
     end = time.time()
-    print(f'[INFO] Time taken to run whole algorithm {iterations} iterations: {end - start}')
+    print(f'[INFO] Time taken to run whole algorithm {iterations} iterations: {end - start:.5f} s')
 finally:
     # Write number of iterations and time went through to attributes file
     with open(o_image_directory + 'attributes.txt', 'a') as f:
         f.write(f'\nNumber of iterations: {current_iteration}')
-        f.write(f'\nTime: {time.time() - start}')
+        f.write(f'\nTime: {time.time() - start:.5f} s')
     # Collect images in a gif
     images = []
     for filename in os.listdir(o_image_directory):
         if os.path.splitext(filename)[1] == '.jpg':
             images.append(imageio.imread(o_image_directory + filename))
-    imageio.mimsave(o_image_directory + 'collected_images.gif', images, duration=0.3)
+    imageio.mimsave(o_image_directory + '/collected_images.gif', images, duration=0.3)
     print('[INFO] Saved gif of collected images')
