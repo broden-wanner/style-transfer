@@ -1,26 +1,26 @@
 import os
 import time
 import numpy as np
-import imageio # Used for creating the gif
+import imageio
 from PIL import Image
 from keras import backend as K
 from keras.preprocessing.image import load_img, img_to_array
 from keras.applications import VGG16, VGG19
 from keras.applications.vgg16 import preprocess_input as vgg16_preprocess
 from keras.applications.vgg19 import preprocess_input as vgg19_preprocess
-from scipy.optimize import fmin_l_bfgs_b, minimize
+from scipy.optimize import minimize
 
 # Specify image paths
 c_image_path = './initial_images/llama.jpg'
 s_image_path = './initial_images/starry_night.jpg'
-o_image_directory = './output/llama_and_starry_night'
+o_image_directory = './output/llama_and_starry_night/'
 directory = os.path.dirname(o_image_directory)
 if not os.path.exists(directory):
     os.makedirs(directory)
     print('[INFO] Created directory ' + o_image_directory[2:-1])
 
 # Specify weights of content (alpha), style (beta), and variation (gamma) loss
-alpha = 5.0
+alpha = 10.0
 beta = 10000.0
 gamma = 100.0
 
@@ -34,7 +34,7 @@ elif model_name == 'VGG19':
     Model = VGG19
     preprocess_input = vgg19_preprocess
 
-# Specify layers to use in model
+# Specify layers to use in model for feature representations
 c_layer_name = 'block4_conv2'
 s_layer_names = [
     'block1_conv1',
@@ -43,7 +43,7 @@ s_layer_names = [
     'block4_conv1',
 ]
 
-# Create a text file that describes the parameters used in the script
+# Create a text file that describes the hyperparameters used in the script
 with open(o_image_directory + 'attributes.txt', 'w') as f:
     f.write('Attributes of Style Transfer\n\n')
     f.write(f'Content image: {c_image_path[17:]}\n')
@@ -81,13 +81,14 @@ s_image_arr = K.variable(preprocess_input(np.expand_dims(s_image_arr, axis=0)), 
 o_image_initial = np.random.randint(256, size=(target_width, target_height, 3)).astype('float32')
 o_image_initial = preprocess_input(np.expand_dims(o_image_initial, axis=0))
 o_image_placeholder = K.placeholder(shape=(1, target_width, target_height, 3))
-print('[INFO] Loaded images')
+print('[INFO] Loaded and preprocessed images')
 
 # Define the loss functions and other helper functions
-def get_feature_reps(x, layer_names, model):
+def get_feature_reps(layer_names, model):
     '''
     Calculates the feature representations for each specified layer in the given model
     '''
+    feat_start = time.time()
     feature_matrices = []
     for layer in layer_names:
         current_layer = model.get_layer(layer)
@@ -98,6 +99,7 @@ def get_feature_reps(x, layer_names, model):
         feature_matrix = K.reshape(feature_raw, (M_l, N_l))
         feature_matrix = K.transpose(feature_matrix)
         feature_matrices.append(feature_matrix)
+    print(f'Time taken to get feature reps: {time.time() - feat_start:.5f} s')
     return feature_matrices
 
 def get_content_loss(F, P):
@@ -118,6 +120,7 @@ def get_style_loss(ws, Gs, As):
     '''
     Computes the loss function for the the given style feautre representations
     '''
+    style_time = time.time()
     style_loss = K.variable(0.)
     for w, G, A in zip(ws, Gs, As):
         M_l = K.int_shape(G)[1]
@@ -125,6 +128,7 @@ def get_style_loss(ws, Gs, As):
         G_gram = get_gram_matrix(G)
         A_gram = get_gram_matrix(A)
         style_loss += w*0.25*K.sum(K.square(G_gram - A_gram))/ (N_l**2 * M_l**2)
+    print(f'Time taken to get style loss: {time.time() - style_time:.5f} s')
     return style_loss
 
 def get_variation_loss(x):
@@ -132,16 +136,17 @@ def get_variation_loss(x):
     Computes the total variation loss for a given image. This measures how much noise is in the
     images and is used to supress noise during optimization.
     '''
-    pixel_dif1 = x[:, :, :-1, :-1] - x[:, :, 1:, :-1]
-    pixel_dif2 = x[:, :, :-1, :-1] - x[:, :, :-1, 1:]
-    return K.sum(K.pow(pixel_dif1 + pixel_dif2, 2))
+    pixel_dif1 = K.square(x[:, :, :-1, :-1] - x[:, :, 1:, :-1])
+    pixel_dif2 = K.square(x[:, :, :-1, :-1] - x[:, :, :-1, 1:])
+    variation_loss = K.sum(pixel_dif1 + pixel_dif2)
+    return variation_loss
 
 def get_total_loss(o_image_placeholder):
     '''
     Combines the loss of the content and style images
     '''
-    F = get_feature_reps(o_image_placeholder, layer_names=[c_layer_name], model=o_model)[0]
-    Gs = get_feature_reps(o_image_placeholder, layer_names=s_layer_names, model=o_model)
+    F = get_feature_reps(layer_names=[c_layer_name], model=o_model)[0]
+    Gs = get_feature_reps(layer_names=s_layer_names, model=o_model)
     content_loss = get_content_loss(F, P)
     style_loss = get_style_loss(ws, Gs, As)
     variation_loss = get_variation_loss(o_image_placeholder)
@@ -152,10 +157,12 @@ def calculate_loss(o_image_arr):
     '''
     Calculate total loss using K.function
     '''
+    loss_start = time.time()
     if o_image_arr.shape != (1, target_width, target_width, 3):
         o_image_arr = o_image_arr.reshape((1, target_width, target_height, 3))
     loss_function = K.function([o_model.input], [get_total_loss(o_model.input)])
     loss = loss_function([o_image_arr])[0].astype('float64')
+    print(f'Time taken to find loss: {time.time() - loss_start:.5f} s')
     return loss
 
 def calculuate_gradient(o_image_arr):
@@ -193,11 +200,11 @@ def save_image(x, image_number=None, title=None, target_size=c_image_original_si
     x_image = Image.fromarray(x)
     x_image = x_image.resize(target_size)
     if image_number:
-        image_path = o_image_directory + f'/image_at_iteration_{image_number:03d}.jpg'
+        image_path = o_image_directory + f'image_at_iteration_{image_number:03d}.jpg'
     elif title:
-        image_path = o_image_directory + f'/{title}.jpg'
+        image_path = o_image_directory + f'{title}.jpg'
     else:
-        image_path = o_image_directory + f'/output_image.jpg'
+        image_path = o_image_directory + f'output_image.jpg'
     x_image.save(image_path)
     print(f'[INFO] Image saved at {image_path}')
 
@@ -226,8 +233,8 @@ print('[INFO] Model summary for each image:')
 c_model.summary()
 
 # Get the feature represenations of the content and style images
-P = get_feature_reps(x=c_image_arr, layer_names=[c_layer_name], model=c_model)[0]
-As = get_feature_reps(x=s_image_arr, layer_names=s_layer_names, model=s_model)
+P = get_feature_reps(layer_names=[c_layer_name], model=c_model)[0]
+As = get_feature_reps(layer_names=s_layer_names, model=s_model)
 
 # Initialize weights to be reciprocal of number of style layers used
 ws = np.ones(len(s_layer_names)) / float(len(s_layer_names))
@@ -248,7 +255,6 @@ try:
             'disp': True,
         },
     }
-    # x_output, f_minimum_val, info_dict = fmin_l_bfgs_b(**minimization_options)
     result = minimize(**minimization_options)
     x_output = postprocess_array(result.x)
     save_image(x_output, title='last_image')
@@ -265,5 +271,5 @@ finally:
     for filename in os.listdir(o_image_directory):
         if os.path.splitext(filename)[1] == '.jpg':
             images.append(imageio.imread(o_image_directory + filename))
-    imageio.mimsave(o_image_directory + '/collected_images.gif', images, duration=0.3)
+    imageio.mimsave(o_image_directory + 'collected_images.gif', images, duration=0.3)
     print('[INFO] Saved gif of collected images')
