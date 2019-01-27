@@ -1,0 +1,17 @@
+Attributes of Style Transfer
+
+Content image: polar_bear.jpg
+Style image: sistine_chapel.jpg
+Model used: VGG16
+Alpha (content weight): 5.0
+Beta (style weight): 10000.0
+Gamma (total variation weight): 10.0
+Content layers used:
+	block4_conv2
+Style layers used:
+	block1_conv1	block2_conv1	block3_conv1	block4_conv1
+Special Notes:
+	None
+
+Number of iterations: 32
+Time: 450.48904 s

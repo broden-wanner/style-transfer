@@ -11,18 +11,18 @@ from keras.applications.vgg19 import preprocess_input as vgg19_preprocess
 from scipy.optimize import minimize
 
 # Specify image paths
-c_image_path = './initial_images/llama.jpg'
-s_image_path = './initial_images/starry_night.jpg'
-o_image_directory = './output/llama_and_starry_night/'
+c_image_path = './initial_images/polar_bear.jpg'
+s_image_path = './initial_images/sistine_chapel.jpg'
+o_image_directory = './output/bear_and_sistine_chapel/'
 directory = os.path.dirname(o_image_directory)
 if not os.path.exists(directory):
     os.makedirs(directory)
     print('[INFO] Created directory ' + o_image_directory[2:-1])
 
 # Specify weights of content (alpha), style (beta), and variation (gamma) loss
-alpha = 10.0
+alpha = 5.0
 beta = 10000.0
-gamma = 100.0
+gamma = 10.0
 
 # Specify type of model used
 model_name = 'VGG16'
@@ -60,7 +60,6 @@ with open(o_image_directory + 'attributes.txt', 'w') as f:
     f.write('\n')
     f.write(f'Special Notes:\n')
     f.write(f'\tNone\n')
-
 print('[INFO] Created attributes.txt file')
 
 # Image Processing
@@ -88,18 +87,15 @@ def get_feature_reps(layer_names, model):
     '''
     Calculates the feature representations for each specified layer in the given model
     '''
-    feat_start = time.time()
     feature_matrices = []
     for layer in layer_names:
-        current_layer = model.get_layer(layer)
-        feature_raw = current_layer.output
+        feature_raw = model.get_layer(layer).output
         feature_raw_shape = K.shape(feature_raw).eval(session=backend_session)
         N_l = feature_raw_shape[-1]
         M_l = feature_raw_shape[1]*feature_raw_shape[2]
         feature_matrix = K.reshape(feature_raw, (M_l, N_l))
         feature_matrix = K.transpose(feature_matrix)
         feature_matrices.append(feature_matrix)
-    print(f'Time taken to get feature reps: {time.time() - feat_start:.5f} s')
     return feature_matrices
 
 def get_content_loss(F, P):
@@ -120,7 +116,6 @@ def get_style_loss(ws, Gs, As):
     '''
     Computes the loss function for the the given style feautre representations
     '''
-    style_time = time.time()
     style_loss = K.variable(0.)
     for w, G, A in zip(ws, Gs, As):
         M_l = K.int_shape(G)[1]
@@ -128,7 +123,6 @@ def get_style_loss(ws, Gs, As):
         G_gram = get_gram_matrix(G)
         A_gram = get_gram_matrix(A)
         style_loss += w*0.25*K.sum(K.square(G_gram - A_gram))/ (N_l**2 * M_l**2)
-    print(f'Time taken to get style loss: {time.time() - style_time:.5f} s')
     return style_loss
 
 def get_variation_loss(x):
@@ -157,24 +151,19 @@ def calculate_loss(o_image_arr):
     '''
     Calculate total loss using K.function
     '''
-    loss_start = time.time()
     if o_image_arr.shape != (1, target_width, target_width, 3):
         o_image_arr = o_image_arr.reshape((1, target_width, target_height, 3))
     loss_function = K.function([o_model.input], [get_total_loss(o_model.input)])
-    loss = loss_function([o_image_arr])[0].astype('float64')
-    print(f'Time taken to find loss: {time.time() - loss_start:.5f} s')
     return loss
 
 def calculuate_gradient(o_image_arr):
     '''
     Calculate the gradient of the loss function with respect to the generated image
     '''
-    grad_start = time.time()
     if o_image_arr.shape != (1, target_width, target_height, 3):
         o_image_arr = o_image_arr.reshape((1, target_width, target_height, 3))
     gradient_function = K.function([o_model.input], K.gradients(get_total_loss(o_model.input), [o_model.input]))
     gradient = gradient_function([o_image_arr])[0].flatten().astype('float64')
-    print(f'Time to find gradient: {time.time() - grad_start:.5f} s')
     return gradient
 
 def postprocess_array(x):
