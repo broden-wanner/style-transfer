@@ -13,5 +13,5 @@ Style layers used:
 Special Notes:
 	None
 
-Number of iterations: 32
-Time: 450.48904 s
+Number of iterations: 47
+Time: 427.16530 s
