@@ -11,16 +11,25 @@ from keras.applications.vgg19 import preprocess_input as vgg19_preprocess
 from scipy.optimize import minimize
 
 # Specify image paths
-c_image_path = './initial_images/polar_bear.jpg'
-s_image_path = './initial_images/sistine_chapel.jpg'
-o_image_directory = './output/bear_and_sistine_chapel/'
+c_image_path = './initial_images/clownfish.jpg'
+s_image_path = './initial_images/composition_vii.jpg'
+o_image_directory = './output/clownfish_and_composition_vii/'
+
+if len([filename for filename in os.listdir('./output/') if o_image_directory[9:-1] in filename]) > 0:
+    directory_number = o_image_directory[-3:-1]
+    try:
+        directory_number = int(directory_number) + 1
+    except ValueError:
+        directory_number = 2
+    o_image_directory = f'{o_image_directory[:-1]}{directory_number:02d}/'
+else:
+    o_image_directory = f'{o_image_directory[:-1]}01/'
 directory = os.path.dirname(o_image_directory)
-if not os.path.exists(directory):
-    os.makedirs(directory)
-    print('[INFO] Created directory ' + o_image_directory[2:-1])
+os.makedirs(directory)
+print('[INFO] Created directory ' + o_image_directory[9:-1])
 
 # Specify weights of content (alpha), style (beta), and variation (gamma) loss
-alpha = 5.0
+alpha = 10.0
 beta = 10000.0
 gamma = 10.0
 
@@ -43,6 +52,10 @@ s_layer_names = [
     'block4_conv1',
 ]
 
+# Specify the size of the image used for minimization
+target_width = 512
+target_height = 512
+
 # Create a text file that describes the hyperparameters used in the script
 with open(o_image_directory + 'attributes.txt', 'w') as f:
     f.write('Attributes of Style Transfer\n\n')
@@ -63,8 +76,6 @@ with open(o_image_directory + 'attributes.txt', 'w') as f:
 print('[INFO] Created attributes.txt file')
 
 # Image Processing
-target_height = 512
-target_width = 512
 target_size = (target_height, target_width)
 
 c_image_original = Image.open(c_image_path)
@@ -154,7 +165,7 @@ def calculate_loss(o_image_arr):
     if o_image_arr.shape != (1, target_width, target_width, 3):
         o_image_arr = o_image_arr.reshape((1, target_width, target_height, 3))
     loss_function = K.function([o_model.input], [get_total_loss(o_model.input)])
-    return loss
+    return loss_function([o_image_arr])[0].astype('float64')
 
 def calculuate_gradient(o_image_arr):
     '''
@@ -163,8 +174,7 @@ def calculuate_gradient(o_image_arr):
     if o_image_arr.shape != (1, target_width, target_height, 3):
         o_image_arr = o_image_arr.reshape((1, target_width, target_height, 3))
     gradient_function = K.function([o_model.input], K.gradients(get_total_loss(o_model.input), [o_model.input]))
-    gradient = gradient_function([o_image_arr])[0].flatten().astype('float64')
-    return gradient
+    return gradient_function([o_image_arr])[0].flatten().astype('float64')
 
 def postprocess_array(x):
     '''
